@@ -30,6 +30,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 @ExtendWith(MockitoExtension.class)
 class FeatureFlagServiceTest {
@@ -299,5 +300,47 @@ class FeatureFlagServiceTest {
 		assertThatThrownBy(() -> service.create(request))
 			.isInstanceOf(RuntimeException.class)
 			.hasMessageContaining("DB unavailable");
+	}
+
+	@Test
+	void shouldThrowDuplicateFeatureExceptionWhenConcurrentCreateConflictsAtSave() {
+		// Given
+		CreateFeatureFlagRequest request = new CreateFeatureFlagRequest(
+			"NEW_CHECKOUT",
+			true,
+			StrategyType.COUNTRY,
+			Map.of("country", "IN")
+		);
+		FeatureFlag entity = FeatureFlag.builder().featureName("NEW_CHECKOUT").enabled(true).build();
+
+		when(repository.findByFeatureName("NEW_CHECKOUT")).thenReturn(Optional.empty());
+		when(mapper.toEntity(request)).thenReturn(entity);
+		when(repository.save(entity)).thenThrow(new DataIntegrityViolationException("duplicate key"));
+
+		// When + Then
+		assertThatThrownBy(() -> service.create(request))
+			.isInstanceOf(DuplicateFeatureException.class)
+			.hasMessageContaining("Feature already exists");
+	}
+
+	@Test
+	void shouldThrowDuplicateFeatureExceptionWhenConcurrentUpdateConflictsAtSave() {
+		// Given
+		UUID id = UUID.randomUUID();
+		UpdateFeatureFlagRequest request = new UpdateFeatureFlagRequest(
+			"NEW_CHECKOUT",
+			true,
+			StrategyType.COUNTRY,
+			Map.of("country", "IN")
+		);
+		FeatureFlag existing = FeatureFlag.builder().id(id).featureName("OLD_NAME").enabled(true).build();
+
+		when(repository.findById(id)).thenReturn(Optional.of(existing));
+		when(repository.save(existing)).thenThrow(new DataIntegrityViolationException("duplicate key"));
+
+		// When + Then
+		assertThatThrownBy(() -> service.update(id, request))
+			.isInstanceOf(DuplicateFeatureException.class)
+			.hasMessageContaining("Feature already exists");
 	}
 }

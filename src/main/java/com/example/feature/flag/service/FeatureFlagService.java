@@ -12,6 +12,7 @@ import com.example.feature.flag.mapper.FeatureFlagMapper;
 import com.example.feature.flag.repository.FeatureFlagRepository;
 import com.example.feature.flag.strategy.FeatureEvaluationStrategy;
 import com.example.feature.flag.strategy.FeatureEvaluationStrategyFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,9 +39,14 @@ public class FeatureFlagService {
 			throw new DuplicateFeatureException("Feature already exists: " + request.featureName());
 		});
 
-		FeatureFlag entity = mapper.toEntity(request);
-		FeatureFlag saved = repository.save(entity);
-		return mapper.toResponse(saved);
+		try {
+			FeatureFlag entity = mapper.toEntity(request);
+			FeatureFlag saved = repository.save(entity);
+			return mapper.toResponse(saved);
+		} catch (DataIntegrityViolationException exception) {
+			// Handles concurrent create requests racing after pre-check.
+			throw new DuplicateFeatureException("Feature already exists: " + request.featureName());
+		}
 	}
 
 	@Transactional
@@ -48,9 +54,14 @@ public class FeatureFlagService {
 		FeatureFlag existing = repository.findById(id)
 			.orElseThrow(() -> new FeatureNotFoundException("Feature not found for id: " + id));
 
-		mapper.updateEntity(existing, request);
-		FeatureFlag saved = repository.save(existing);
-		return mapper.toResponse(saved);
+		try {
+			mapper.updateEntity(existing, request);
+			FeatureFlag saved = repository.save(existing);
+			return mapper.toResponse(saved);
+		} catch (DataIntegrityViolationException exception) {
+			// Handles rename conflicts under concurrent updates.
+			throw new DuplicateFeatureException("Feature already exists: " + request.featureName());
+		}
 	}
 
 	@Transactional(readOnly = true)

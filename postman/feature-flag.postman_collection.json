@@ -1,0 +1,244 @@
+{
+  "info": {
+    "name": "Feature Flag Service - Edge Cases",
+    "_postman_id": "7aa81f6e-0f89-43ec-9bb2-6db6d9f63a11",
+    "description": "Collection for happy path, validation, and edge-case testing of the Feature Flag Service.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "01 Create COUNTRY flag - happy path",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/api/v1/flags",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"featureName\": \"NEW_CHECKOUT\",\n  \"enabled\": true,\n  \"strategy\": \"COUNTRY\",\n  \"rules\": { \"country\": \"IN\" }\n}"
+        }
+      }
+    },
+    {
+      "name": "02 Create USER flag - happy path",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/api/v1/flags",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"featureName\": \"UPI_ROLLOUT\",\n  \"enabled\": true,\n  \"strategy\": \"USER\",\n  \"rules\": { \"userId\": \"user-123\" }\n}"
+        }
+      }
+    },
+    {
+      "name": "03 Create PERCENTAGE flag - happy path",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/api/v1/flags",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"featureName\": \"BETA_SEARCH\",\n  \"enabled\": true,\n  \"strategy\": \"PERCENTAGE\",\n  \"rules\": { \"percentage\": 30 }\n}"
+        }
+      }
+    },
+    {
+      "name": "04 Create duplicate feature - expect 409",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/api/v1/flags",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"featureName\": \"NEW_CHECKOUT\",\n  \"enabled\": true,\n  \"strategy\": \"COUNTRY\",\n  \"rules\": { \"country\": \"IN\" }\n}"
+        }
+      }
+    },
+    {
+      "name": "05 Create invalid payload - blank featureName",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/api/v1/flags",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"featureName\": \"\",\n  \"enabled\": true,\n  \"strategy\": \"COUNTRY\",\n  \"rules\": { \"country\": \"IN\" }\n}"
+        }
+      }
+    },
+    {
+      "name": "06 Get flag by featureName - success",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/v1/flags/NEW_CHECKOUT"
+      }
+    },
+    {
+      "name": "07 Get missing flag - expect 404",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/v1/flags/UNKNOWN_FLAG"
+      }
+    },
+    {
+      "name": "08 Update by id - set disabled",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/api/v1/flags/{{featureId}}",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"featureName\": \"NEW_CHECKOUT\",\n  \"enabled\": false,\n  \"strategy\": \"COUNTRY\",\n  \"rules\": { \"country\": \"IN\" }\n}"
+        }
+      }
+    },
+    {
+      "name": "09 Update missing id - expect 404",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/api/v1/flags/11111111-1111-1111-1111-111111111111",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"featureName\": \"ANY_FLAG\",\n  \"enabled\": true,\n  \"strategy\": \"COUNTRY\",\n  \"rules\": { \"country\": \"IN\" }\n}"
+        }
+      }
+    },
+    {
+      "name": "10 Evaluate COUNTRY match",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/api/v1/flags/evaluate",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"featureName\": \"NEW_CHECKOUT\",\n  \"context\": { \"country\": \"IN\" }\n}"
+        }
+      }
+    },
+    {
+      "name": "11 Evaluate COUNTRY non-match",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/api/v1/flags/evaluate",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"featureName\": \"NEW_CHECKOUT\",\n  \"context\": { \"country\": \"US\" }\n}"
+        }
+      }
+    },
+    {
+      "name": "12 Evaluate USER match",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/api/v1/flags/evaluate",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"featureName\": \"UPI_ROLLOUT\",\n  \"context\": { \"userId\": \"user-123\" }\n}"
+        }
+      }
+    },
+    {
+      "name": "13 Evaluate USER non-match",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/api/v1/flags/evaluate",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"featureName\": \"UPI_ROLLOUT\",\n  \"context\": { \"userId\": \"user-999\" }\n}"
+        }
+      }
+    },
+    {
+      "name": "14 Evaluate PERCENTAGE deterministic",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/api/v1/flags/evaluate",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"featureName\": \"BETA_SEARCH\",\n  \"context\": { \"userId\": \"stable-user-001\" }\n}"
+        }
+      }
+    },
+    {
+      "name": "15 Evaluate disabled feature short-circuit false",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/api/v1/flags/evaluate",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"featureName\": \"NEW_CHECKOUT\",\n  \"context\": { \"country\": \"IN\" }\n}"
+        }
+      }
+    },
+    {
+      "name": "16 Evaluate missing feature - expect 404",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/api/v1/flags/evaluate",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"featureName\": \"NOT_EXIST\",\n  \"context\": { \"country\": \"IN\" }\n}"
+        }
+      }
+    },
+    {
+      "name": "17 Evaluate invalid payload - missing context",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/api/v1/flags/evaluate",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"featureName\": \"NEW_CHECKOUT\"\n}"
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "featureId",
+      "value": "REPLACE_WITH_ID_FROM_CREATE_RESPONSE"
+    }
+  ]
+}

@@ -3,6 +3,8 @@ name: CD Deploy
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -16,8 +18,31 @@ env:
   JAR_NAME: feature-flag-0.0.1-SNAPSHOT.jar
 
 jobs:
+  test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      - name: Run Maven verify
+        env:
+          SPRING_PROFILES_ACTIVE: test
+        run: |
+          chmod +x mvnw
+          ./mvnw -B clean verify
+
   deploy:
     name: Deploy to Droplet
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
