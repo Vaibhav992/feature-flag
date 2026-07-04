@@ -14,3 +14,11 @@ spring:
   flyway:
     enabled: true
     baseline-on-migrate: true
+
+logging:
+  level:
+    root: INFO
+    com.example.feature.flag: INFO
+    org.springframework: INFO
+    org.hibernate.SQL: WARN
+    org.flywaydb: INFO
