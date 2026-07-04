@@ -1,14 +1,12 @@
-name: CI/CD
+name: CD Deploy
 
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 concurrency:
-  group: ci-cd-${{ github.ref }}
+  group: cd-deploy-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -18,31 +16,8 @@ env:
   JAR_NAME: feature-flag-0.0.1-SNAPSHOT.jar
 
 jobs:
-  test:
-    name: Build and Test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up JDK
-        uses: actions/setup-java@v4
-        with:
-          java-version: ${{ env.JAVA_VERSION }}
-          distribution: temurin
-          cache: maven
-
-      - name: Run Maven verify
-        env:
-          SPRING_PROFILES_ACTIVE: test
-        run: |
-          chmod +x mvnw
-          ./mvnw -B clean verify
-
   deploy:
     name: Deploy to Droplet
-    needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -125,7 +100,8 @@ jobs:
             sudo systemctl restart "${APP_NAME}"
 
             for i in $(seq 1 45); do
-              if curl -fsS "http://127.0.0.1:8080/v3/api-docs" >/dev/null; then
+              code=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:8080/api/v1/flags/UNKNOWN" || true)
+              if [ "${code}" = "200" ] || [ "${code}" = "404" ]; then
                 echo "Deploy successful."
                 exit 0
               fi
@@ -133,5 +109,6 @@ jobs:
             done
 
             echo "Health check failed. Service logs:"
+            sudo systemctl status "${APP_NAME}" --no-pager -l || true
             sudo journalctl -u "${APP_NAME}" -n 100 --no-pager
             exit 1
