@@ -1,6 +1,7 @@
 package com.example.feature.flag.strategy;
 
 import com.example.feature.flag.entity.StrategyType;
+import com.example.feature.flag.exception.InvalidStrategyException;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -19,11 +20,11 @@ public class FeatureEvaluationStrategyFactory {
 
 	public FeatureEvaluationStrategy resolve(StrategyType strategyType) {
 		if (strategyType == null) {
-			throw new IllegalArgumentException("strategyType is required");
+			throw new InvalidStrategyException("strategyType is required");
 		}
 		FeatureEvaluationStrategy strategy = strategies.get(strategyType);
 		if (strategy == null) {
-			throw new IllegalArgumentException("No strategy found for type: " + strategyType);
+			throw new InvalidStrategyException("No strategy found for type: " + strategyType);
 		}
 		return strategy;
 	}

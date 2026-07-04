@@ -16,6 +16,7 @@ import com.example.feature.flag.entity.FeatureFlag;
 import com.example.feature.flag.entity.StrategyType;
 import com.example.feature.flag.exception.DuplicateFeatureException;
 import com.example.feature.flag.exception.FeatureNotFoundException;
+import com.example.feature.flag.exception.InvalidStrategyException;
 import com.example.feature.flag.mapper.FeatureFlagMapper;
 import com.example.feature.flag.repository.FeatureFlagRepository;
 import com.example.feature.flag.strategy.FeatureEvaluationStrategy;
@@ -54,7 +55,8 @@ class FeatureFlagServiceTest {
 	}
 
 	@Test
-	void shouldCreateFeatureFlag() {
+	void shouldCreateFeatureFlagSuccessfully() {
+		// Given
 		CreateFeatureFlagRequest request = new CreateFeatureFlagRequest(
 			"NEW_CHECKOUT",
 			true,
@@ -82,13 +84,17 @@ class FeatureFlagServiceTest {
 		when(repository.save(entity)).thenReturn(saved);
 		when(mapper.toResponse(saved)).thenReturn(response);
 
+		// When
 		FeatureFlagResponse result = service.create(request);
 
+		// Then
 		assertThat(result.featureName()).isEqualTo("NEW_CHECKOUT");
+		verify(repository).findByFeatureName("NEW_CHECKOUT");
 	}
 
 	@Test
-	void shouldThrowWhenDuplicateFeatureNameOnCreate() {
+	void shouldThrowDuplicateFeatureExceptionWhenFeatureAlreadyExists() {
+		// Given
 		CreateFeatureFlagRequest request = new CreateFeatureFlagRequest(
 			"NEW_CHECKOUT",
 			true,
@@ -98,12 +104,14 @@ class FeatureFlagServiceTest {
 		when(repository.findByFeatureName("NEW_CHECKOUT"))
 			.thenReturn(Optional.of(FeatureFlag.builder().build()));
 
+		// When + Then
 		assertThatThrownBy(() -> service.create(request))
 			.isInstanceOf(DuplicateFeatureException.class);
 	}
 
 	@Test
-	void shouldUpdateFeatureFlag() {
+	void shouldUpdateFeatureFlagSuccessfully() {
+		// Given
 		UUID id = UUID.randomUUID();
 		UpdateFeatureFlagRequest request = new UpdateFeatureFlagRequest(
 			"UPI_ROLLOUT",
@@ -124,14 +132,17 @@ class FeatureFlagServiceTest {
 		when(repository.save(existing)).thenReturn(existing);
 		when(mapper.toResponse(existing)).thenReturn(response);
 
+		// When
 		FeatureFlagResponse result = service.update(id, request);
 
+		// Then
 		verify(mapper).updateEntity(existing, request);
 		assertThat(result.featureName()).isEqualTo("UPI_ROLLOUT");
 	}
 
 	@Test
-	void shouldThrowWhenUpdateTargetMissing() {
+	void shouldThrowFeatureNotFoundWhenUpdatingMissingFeature() {
+		// Given
 		UUID id = UUID.randomUUID();
 		UpdateFeatureFlagRequest request = new UpdateFeatureFlagRequest(
 			"UPI_ROLLOUT",
@@ -141,12 +152,14 @@ class FeatureFlagServiceTest {
 		);
 		when(repository.findById(id)).thenReturn(Optional.empty());
 
+		// When + Then
 		assertThatThrownBy(() -> service.update(id, request))
 			.isInstanceOf(FeatureNotFoundException.class);
 	}
 
 	@Test
-	void shouldGetByFeatureName() {
+	void shouldGetFeatureFlagByNameSuccessfully() {
+		// Given
 		FeatureFlag entity = FeatureFlag.builder()
 			.id(UUID.randomUUID())
 			.featureName("NEW_CHECKOUT")
@@ -165,13 +178,26 @@ class FeatureFlagServiceTest {
 		when(repository.findByFeatureName("NEW_CHECKOUT")).thenReturn(Optional.of(entity));
 		when(mapper.toResponse(entity)).thenReturn(response);
 
+		// When
 		FeatureFlagResponse result = service.getByFeatureName("NEW_CHECKOUT");
 
+		// Then
 		assertThat(result.featureName()).isEqualTo("NEW_CHECKOUT");
 	}
 
 	@Test
-	void shouldReturnFalseWhenFeatureDisabled() {
+	void shouldThrowFeatureNotFoundWhenGettingMissingFeature() {
+		// Given
+		when(repository.findByFeatureName("UNKNOWN")).thenReturn(Optional.empty());
+
+		// When + Then
+		assertThatThrownBy(() -> service.getByFeatureName("UNKNOWN"))
+			.isInstanceOf(FeatureNotFoundException.class);
+	}
+
+	@Test
+	void shouldReturnFalseWhenFeatureIsDisabled() {
+		// Given
 		FeatureFlag entity = FeatureFlag.builder()
 			.featureName("NEW_CHECKOUT")
 			.enabled(false)
@@ -185,14 +211,17 @@ class FeatureFlagServiceTest {
 
 		when(repository.findByFeatureName("NEW_CHECKOUT")).thenReturn(Optional.of(entity));
 
+		// When
 		EvaluateFeatureFlagResponse result = service.evaluate(request);
 
+		// Then
 		verify(strategyFactory, never()).resolve(any());
 		assertThat(result.enabled()).isFalse();
 	}
 
 	@Test
-	void shouldEvaluateUsingStrategyWhenEnabled() {
+	void shouldEvaluateFeatureUsingResolvedStrategy() {
+		// Given
 		FeatureFlag entity = FeatureFlag.builder()
 			.featureName("NEW_CHECKOUT")
 			.enabled(true)
@@ -208,8 +237,67 @@ class FeatureFlagServiceTest {
 		when(strategyFactory.resolve(StrategyType.COUNTRY)).thenReturn(strategy);
 		when(strategy.evaluate(entity, request.context())).thenReturn(true);
 
+		// When
 		EvaluateFeatureFlagResponse result = service.evaluate(request);
 
+		// Then
 		assertThat(result.enabled()).isTrue();
+		verify(strategyFactory).resolve(StrategyType.COUNTRY);
+		verify(strategy).evaluate(entity, request.context());
+	}
+
+	@Test
+	void shouldThrowFeatureNotFoundWhenEvaluatingMissingFeature() {
+		// Given
+		EvaluateFeatureFlagRequest request = new EvaluateFeatureFlagRequest(
+			"UNKNOWN",
+			Map.of("country", "IN")
+		);
+		when(repository.findByFeatureName("UNKNOWN")).thenReturn(Optional.empty());
+
+		// When + Then
+		assertThatThrownBy(() -> service.evaluate(request))
+			.isInstanceOf(FeatureNotFoundException.class);
+	}
+
+	@Test
+	void shouldThrowInvalidStrategyWhenFactoryCannotResolve() {
+		// Given
+		FeatureFlag entity = FeatureFlag.builder()
+			.featureName("NEW_CHECKOUT")
+			.enabled(true)
+			.strategy(StrategyType.COUNTRY)
+			.rules(objectMapper.createObjectNode().put("country", "IN"))
+			.build();
+		EvaluateFeatureFlagRequest request = new EvaluateFeatureFlagRequest(
+			"NEW_CHECKOUT",
+			Map.of("country", "IN")
+		);
+
+		when(repository.findByFeatureName("NEW_CHECKOUT")).thenReturn(Optional.of(entity));
+		when(strategyFactory.resolve(StrategyType.COUNTRY))
+			.thenThrow(new InvalidStrategyException("No strategy found for type: COUNTRY"));
+
+		// When + Then
+		assertThatThrownBy(() -> service.evaluate(request))
+			.isInstanceOf(InvalidStrategyException.class);
+	}
+
+	@Test
+	void shouldPropagateUnexpectedExceptionWhenRepositoryFails() {
+		// Given
+		CreateFeatureFlagRequest request = new CreateFeatureFlagRequest(
+			"NEW_CHECKOUT",
+			true,
+			StrategyType.COUNTRY,
+			Map.of("country", "IN")
+		);
+		when(repository.findByFeatureName("NEW_CHECKOUT"))
+			.thenThrow(new RuntimeException("DB unavailable"));
+
+		// When + Then
+		assertThatThrownBy(() -> service.create(request))
+			.isInstanceOf(RuntimeException.class)
+			.hasMessageContaining("DB unavailable");
 	}
 }
