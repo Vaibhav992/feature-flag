@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.time.OffsetDateTime;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.dao.DataAccessException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -47,6 +48,18 @@ public class GlobalExceptionHandler {
 			message = fieldError.getDefaultMessage();
 		}
 		return buildError(HttpStatus.BAD_REQUEST, message, request.getRequestURI());
+	}
+
+	@ExceptionHandler(DataAccessException.class)
+	public ResponseEntity<ApiErrorResponse> handleDatabaseUnavailable(
+		DataAccessException exception,
+		HttpServletRequest request
+	) {
+		return buildError(
+			HttpStatus.SERVICE_UNAVAILABLE,
+			"Database temporarily unavailable. Please retry.",
+			request.getRequestURI()
+		);
 	}
 
 	@ExceptionHandler(Exception.class)

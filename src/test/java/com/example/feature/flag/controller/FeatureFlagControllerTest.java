@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -130,7 +131,9 @@ class FeatureFlagControllerTest {
 		mockMvc.perform(post("/api/v1/flags")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(invalidPayload))
-			.andExpect(status().isBadRequest());
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.status").value(400))
+			.andExpect(jsonPath("$.message").value("featureName is required"));
 	}
 
 	@Test
@@ -143,5 +146,18 @@ class FeatureFlagControllerTest {
 		mockMvc.perform(get("/api/v1/flags/{featureName}", "UNKNOWN"))
 			.andExpect(status().isNotFound())
 			.andExpect(jsonPath("$.message").value("Feature not found: UNKNOWN"));
+	}
+
+	@Test
+	void shouldReturn503WhenDatabaseIsUnavailable() throws Exception {
+		// Given
+		when(service.getByFeatureName("NEW_CHECKOUT"))
+			.thenThrow(new DataAccessResourceFailureException("DB down"));
+
+		// When + Then
+		mockMvc.perform(get("/api/v1/flags/{featureName}", "NEW_CHECKOUT"))
+			.andExpect(status().isServiceUnavailable())
+			.andExpect(jsonPath("$.status").value(503))
+			.andExpect(jsonPath("$.message").value("Database temporarily unavailable. Please retry."));
 	}
 }
